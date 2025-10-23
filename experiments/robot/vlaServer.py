@@ -4,6 +4,9 @@ from pydantic import BaseModel
 import numpy as np
 from PIL import Image
 import io
+import os
+import uuid
+import time
 
 
 from openvla_utils import get_processor
@@ -20,11 +23,11 @@ from robot_utils import (
 
 app = FastAPI()
 
-@app.post("/predict")
+
 class OpenVLAConfig:
     def __init__(self):
         self.model_family = "openvla"
-        self.pretrained_checkpoint = "/path/to/your/openvla/checkpoint"  # <-- set your checkpoint path here!
+        self.pretrained_checkpoint = "openvla/openvla-7b"  # <-- set your checkpoint path here!
         self.unnorm_key = "bridge_orig"  # or your dataset key
         self.center_crop = False         # set True if your model was trained with image aug
         self.load_in_8bit = False
@@ -38,11 +41,19 @@ model = get_model(cfg)
 processor = get_processor(cfg)
 resize_size = get_image_resize_size(cfg)
 
+@app.post("/predict")
 async def predict(image: UploadFile = File(...), prompt: str = Form(...)):
     # Read image from request
     img_bytes = await image.read()
     pil_image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     img_np = np.array(pil_image)
+
+    ## Save image to 'out' folder
+    #os.makedirs("out", exist_ok=True)
+    #timestamp = time.strftime("%Y_%m_%d-%H_%M_%S")
+    #unique_id = uuid.uuid4().hex[:8]
+    #image_save_path = os.path.join("out", f"{timestamp}_{unique_id}.png")
+    #pil_image.save(image_save_path)
 
     # Resize image if needed
     if img_np.shape[0] != resize_size or img_np.shape[1] != resize_size:
@@ -74,3 +85,4 @@ async def predict(image: UploadFile = File(...), prompt: str = Form(...)):
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 #run with: python -m uvicorn vlaServer:app --host 0.0.0.0 --port 8000
+#may need: export PYTHONPATH=$PYTHONPATH:/home/zipfelj/openvla/ smth
